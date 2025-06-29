@@ -1,7 +1,6 @@
 /**
-* PHP Email Form Validation - v3.9
-* URL: https://bootstrapmade.com/php-email-form/
-* Author: BootstrapMade.com
+* Formspree.io and BootstrapMade Form Validation
+* This script combines the features of both to handle form submission with Formspree.
 */
 (function () {
   "use strict";
@@ -13,73 +12,51 @@
       event.preventDefault();
 
       let thisForm = this;
+      let status = thisForm.querySelector('.sent-message');
+      let errorMessage = thisForm.querySelector('.error-message');
+      let loading = thisForm.querySelector('.loading');
+
+      // Show loading spinner
+      loading.classList.add('d-block');
+      errorMessage.classList.remove('d-block');
+      status.classList.remove('d-block');
 
       let action = thisForm.getAttribute('action');
-      let recaptcha = thisForm.getAttribute('data-recaptcha-site-key');
-      
-      if( ! action ) {
-        displayError(thisForm, 'The form action property is not set!');
-        return;
-      }
-      thisForm.querySelector('.loading').classList.add('d-block');
-      thisForm.querySelector('.error-message').classList.remove('d-block');
-      thisForm.querySelector('.sent-message').classList.remove('d-block');
+      let data = new FormData(this);
 
-      let formData = new FormData( thisForm );
-
-      if ( recaptcha ) {
-        if(typeof grecaptcha !== "undefined" ) {
-          grecaptcha.ready(function() {
-            try {
-              grecaptcha.execute(recaptcha, {action: 'php_email_form_submit'})
-              .then(token => {
-                formData.set('recaptcha-response', token);
-                php_email_form_submit(thisForm, action, formData);
-              })
-            } catch(error) {
-              displayError(thisForm, error);
-            }
-          });
-        } else {
-          displayError(thisForm, 'The reCaptcha javascript API url is not loaded!')
+      // Fetch API to submit the form data to the Formspree endpoint
+      fetch(action, {
+        method: thisForm.method,
+        body: data,
+        headers: {
+          'Accept': 'application/json'
         }
-      } else {
-        php_email_form_submit(thisForm, action, formData);
-      }
+      })
+      .then(response => {
+        loading.classList.remove('d-block');
+        if (response.ok) {
+          // Success
+          status.innerHTML = "Your Message have been Submitted!";
+          status.classList.add('d-block');
+          thisForm.reset();
+        } else {
+          // Error
+          response.json().then(data => {
+            if (Object.hasOwn(data, 'errors')) {
+              errorMessage.innerHTML = data["errors"].map(error => error["message"]).join(", ");
+            } else {
+              errorMessage.innerHTML = "Oops! There was a problem submitting your form.";
+            }
+            errorMessage.classList.add('d-block');
+          });
+        }
+      })
+      .catch(error => {
+        loading.classList.remove('d-block');
+        errorMessage.innerHTML = "Oops! There was a problem submitting your form.";
+        errorMessage.classList.add('d-block');
+      });
     });
   });
-
-  function php_email_form_submit(thisForm, action, formData) {
-    fetch(action, {
-      method: 'POST',
-      body: formData,
-      headers: {'X-Requested-With': 'XMLHttpRequest'}
-    })
-    .then(response => {
-      if( response.ok ) {
-        return response.text();
-      } else {
-        throw new Error(`${response.status} ${response.statusText} ${response.url}`); 
-      }
-    })
-    .then(data => {
-      thisForm.querySelector('.loading').classList.remove('d-block');
-      if (data.trim() == 'OK') {
-        thisForm.querySelector('.sent-message').classList.add('d-block');
-        thisForm.reset(); 
-      } else {
-        throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action); 
-      }
-    })
-    .catch((error) => {
-      displayError(thisForm, error);
-    });
-  }
-
-  function displayError(thisForm, error) {
-    thisForm.querySelector('.loading').classList.remove('d-block');
-    thisForm.querySelector('.error-message').innerHTML = error;
-    thisForm.querySelector('.error-message').classList.add('d-block');
-  }
 
 })();
